@@ -159,7 +159,10 @@ export class PromoterPayments {
         }
 
         const [data, total] = await Promise.all([
-            prisma.promoter_payments.findMany({ where, skip, take: limit, orderBy: { dt_register: 'desc' } }),
+            prisma.promoter_payments.findMany({
+                where, skip, take: limit, orderBy: { dt_register: 'desc' },
+                include: { promoter: { select: { id: true, name: true, lastname: true, phone: true } } }
+            }),
             prisma.promoter_payments.count({ where })
         ])
 

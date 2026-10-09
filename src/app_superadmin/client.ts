@@ -150,19 +150,19 @@ export class Client {
             const totalClientsResult = await this.db.select<TotalRow[]>(`SELECT COUNT(*) AS total FROM clients`);
             const totalClients = totalClientsResult[0]?.total || 0;
 
-            const totalUsuriosPromotoresResult = await this.db.select<TotalRow[]>(`SELECT COUNT(DISTINCT id_promoter) AS total FROM promoters`);
+            const totalUsuriosPromotoresResult = await this.db.select<TotalRow[]>(`SELECT COUNT(*) AS total FROM promoters WHERE dt_deleted IS NULL`);
             const totalUsuariosPromotores = totalUsuriosPromotoresResult[0]?.total || 0;
 
             const totalStoresResult = await this.db.select<TotalRow[]>(`SELECT COUNT(*) AS total FROM stores`);
             const totalStores = totalStoresResult[0]?.total || 0;
 
-            const activeUsersPromotoersResult = await this.db.select<TotalRow[]>(`SELECT COUNT(DISTINCT id_promoter) AS total FROM promoters WHERE b_active = 1 AND dt_last_login BETWEEN ? AND ?`, [dateFrom, dateTo]);
+            const activeUsersPromotoersResult = await this.db.select<TotalRow[]>(`SELECT COUNT(*) AS total FROM promoters WHERE isActive = 1 AND dt_deleted IS NULL AND dt_last_login BETWEEN ? AND ?`, [dateFrom, dateTo]);
             const activeUsersPromoters = activeUsersPromotoersResult[0]?.total || 0;
 
             const heatmapPromoters = await this.db.select<PromoterHeatmapRow[]>(
-                `SELECT id_promoter, vc_name, f_latitude, f_longitude
+                `SELECT id AS id_promoter, name AS vc_name, latitude AS f_latitude, longitude AS f_longitude
                 FROM promoters
-                WHERE f_latitude IS NOT NULL AND f_longitude IS NOT NULL
+                WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND dt_deleted IS NULL
                 ORDER BY dt_last_login DESC
                 LIMIT 100`
             );

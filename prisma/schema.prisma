@@ -301,6 +301,14 @@ model promoters {
   longitude     Decimal?  @db.Decimal(11, 8)
   vc_referral_code String? @unique(map: "uq_promoters_referral_code") @db.VarChar(20)
   id_activator     Int?    @db.UnsignedInt
+  /// Switch global de "INFO" que ve el promotor arriba en todas las
+  /// pantallas (junto a su foto de perfil). Prende/apaga a la vez los 5
+  /// videos de introduccion (ver intro_video_clips); no es por seccion.
+  b_show_intro_videos Boolean @default(true)
+  /// Genero del promotor, elegido por el mismo desde su perfil en la app.
+  /// Se usa para elegir el avatar del asistente de "Dudas?" (se le muestra
+  /// una mujer si es hombre, un hombre si es mujer). Null hasta que lo capture.
+  vc_gender String? @db.VarChar(1)
   tasks                  tasks[]
   promoter_bank_accounts promoter_bank_accounts[]
   payments               promoter_payments[]
@@ -465,6 +473,10 @@ model requests {
   /// promotor puede levantar un pedido con el encargado de la tienda por lo
   /// que le falte contra el minimo configurado, y mandarselo por WhatsApp.
   b_preorder       Boolean            @default(false)
+  /// Solo aplica si b_preorder es true. 'ABIERTA': el encargado de la tienda
+  /// elige la fecha/turno de entrega. 'CERRADA': se asigna automaticamente
+  /// segun la ruta del cliente.
+  preorder_date_mode String           @default("ABIERTA") @db.VarChar(10)
   url_rack_image   String?            @db.VarChar(500)
   order_items      order_items[]
   order_requests   order_requests[]
@@ -737,6 +749,8 @@ model users {
   /// El master reseteo la contraseña (queda en "1234") y esta persona debe
   /// poner una nueva antes de poder usar el resto del sistema.
   must_change_password   Boolean                @default(false)
+  /// JSON con la lista de rutas del menu permitidas. NULL = ve todo (usuario master).
+  vc_permisos            String?                @db.Text
   id_client              Int                    @default(0) @db.UnsignedInt
   id_user_creator        Int                    @default(0) @db.UnsignedInt
   client_logs            client_logs[]
@@ -1025,6 +1039,12 @@ model delivery_routes {
   id_client   Int                    @db.UnsignedInt
   id_driver   Int                    @db.UnsignedInt
   route_date  DateTime               @db.Date
+  /// Horario real de cada turno para esta ruta (ej. "10:00" a "13:00"),
+  /// se define cada vez que se arma la ruta. Null = no se especifico.
+  manana_inicio String?              @db.VarChar(5)
+  manana_fin    String?              @db.VarChar(5)
+  tarde_inicio  String?              @db.VarChar(5)
+  tarde_fin     String?              @db.VarChar(5)
   /// El cliente puede desactivar una ruta ya organizada (por ejemplo, si ya
   /// no se va a usar) sin borrar su historial -- asi sabe la ultima vez
   /// que se uso con solo ver route_date. Si viene de una asignacion
@@ -1054,6 +1074,9 @@ model delivery_route_stops {
   id_stop              Int             @id @default(autoincrement()) @db.UnsignedInt
   id_route             Int             @db.UnsignedInt
   id_store             Int             @db.UnsignedInt
+  /// 'MAÑANA' o 'TARDE' -- turno en el que se visita esta tienda dentro
+  /// de ESTA ruta especifica (se etiqueta cada vez que se arma la ruta).
+  turno                String          @default("MAÑANA") @db.VarChar(10)
   /// Puede no haber pedido — algunas visitas son solo de revision/entrega
   /// general, sin un prepedido especifico detras.
   id_preorder          Int?            @db.UnsignedInt
@@ -1114,6 +1137,25 @@ model app_settings {
   dt_updated  DateTime @default(now()) @updatedAt @db.Timestamp(0)
 }
 
+/// Clips crudos (fondo verde, sin procesar) que el master sube por cada uno
+/// de los 5 "checkpoints" del video de introduccion (ver
+/// IntroVideosService.CHECKPOINTS para las llaves validas de vc_checkpoint_key:
+/// fotos_antes, fotos_post_foto1, fotos_post_foto2, preguntas, preventa).
+/// Puede haber varios clips por checkpoint, ordenados por i_order; se pegan
+/// en un solo video (ffmpeg) cuyo resultado se guarda en app_settings bajo
+/// la llave `intro_video_processed_<checkpoint_key>` (fuera de esta tabla
+/// para no duplicar tabla de "1 valor" que app_settings ya resuelve).
+model intro_video_clips {
+  id_clip           Int      @id @default(autoincrement()) @db.UnsignedInt
+  vc_checkpoint_key String   @db.VarChar(50)
+  vc_url            String   @db.VarChar(500)
+  vc_bucket_path    String   @db.VarChar(500)
+  i_order           Int      @default(0)
+  dt_register       DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([vc_checkpoint_key, i_order], map: "idx_intro_video_clips_checkpoint")
+}
+
 /// Ruta reutilizable que el cliente arma una vez (nombre + tiendas + con que
 /// frecuencia se repite), para no tener que buscar tienda por tienda cada
 /// vez que organiza una ruta de entrega. Al "Organizar ruta" en Logistica,
@@ -1135,6 +1177,9 @@ model route_template_stores {
   id_route_template_store Int              @id @default(autoincrement()) @db.UnsignedInt
   id_route_template       Int              @db.UnsignedInt
   id_store                Int              @db.UnsignedInt
+  /// 'MAÑANA' o 'TARDE' -- turno en el que se visita esta tienda dentro
+  /// de la ruta. Default MAÑANA para no romper tiendas ya guardadas.
+  turno                   String           @default("MAÑANA") @db.VarChar(10)
   route_template          route_templates  @relation(fields: [id_route_template], references: [id_route_template], onDelete: Cascade)
 
   @@unique([id_route_template, id_store], map: "uq_route_template_store")
@@ -1157,6 +1202,8 @@ model route_driver_schedules {
   /// Semana de referencia para contar el intervalo (la fecha en que se creo
   /// la primer ruta de esta asignacion). No cambia aunque pasen las semanas.
   anchor_date       DateTime         @db.Date
+  /// Turno de la visita en este dia: 'MANANA' o 'TARDE'
+  turno             String           @default("MANANA") @db.VarChar(10)
   is_active         Boolean          @default(true)
   dt_register       DateTime         @default(now()) @db.Timestamp(0)
   route_template    route_templates  @relation(fields: [id_route_template], references: [id_route_template], onDelete: Cascade)
@@ -1165,4 +1212,100 @@ model route_driver_schedules {
 
   @@index([id_client], map: "idx_route_schedules_client")
   @@index([id_route_template], map: "idx_route_schedules_template")
+}
+
+
+/// Pantalla de la app registrada por el master para poder senalar botones
+/// sobre ella en las respuestas de "Dudas?". Cada pantalla tiene una foto
+/// (screenshot) subida por el master y, sobre ella, los botones marcados
+/// (ver faq_screen_elements).
+model faq_screens {
+  id_faq_screen             Int      @id @default(autoincrement()) @db.UnsignedInt
+  vc_screen_key             String   @unique @db.VarChar(100)
+  vc_title                  String   @db.VarChar(150)
+  vc_screenshot_url         String   @db.VarChar(500)
+  vc_screenshot_bucket_path String   @db.VarChar(500)
+  vc_app_route              String?  @db.VarChar(100)
+  dt_register               DateTime @default(now()) @db.Timestamp(0)
+  dt_updated                DateTime @default(now()) @updatedAt @db.Timestamp(0)
+  elements                  faq_screen_elements[]
+}
+
+/// Un boton/elemento marcado por el master sobre la foto de una pantalla
+/// (faq_screens), con el rectangulo donde aparece (en porcentaje, para que
+/// no dependa de la resolucion de pantalla). vc_element_key debe coincidir
+/// con la llave real que tiene ese boton en el codigo de la app (Flutter),
+/// para poder resaltarlo de verdad cuando se usa en un paso (ver
+/// faq_highlight_steps).
+model faq_screen_elements {
+  id_faq_screen_element Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_faq_screen         Int      @db.UnsignedInt
+  vc_element_key        String   @db.VarChar(100)
+  vc_label              String   @db.VarChar(150)
+  f_x                   Float
+  f_y                   Float
+  f_width               Float
+  f_height              Float
+  vc_direction          String?  @db.VarChar(20)
+  f_rotation_deg        Float    @default(0)
+  dt_register           DateTime @default(now()) @db.Timestamp(0)
+  screen                faq_screens @relation(fields: [id_faq_screen], references: [id_faq_screen], onDelete: Cascade)
+  steps                 faq_highlight_steps[]
+
+  @@unique([id_faq_screen, vc_element_key], map: "uq_faq_screen_element_key")
+}
+
+/// Pregunta frecuente armada por el master: una respuesta con varias
+/// formas distintas de preguntarla (faq_question_phrases) para que el
+/// promotor la encuentre escriba como escriba, y opcionalmente una
+/// secuencia de botones a resaltar (faq_highlight_steps).
+model faq_questions {
+  id_faq_question Int      @id @default(autoincrement()) @db.UnsignedInt
+  vc_answer_text  String   @db.Text
+  i_status        Int      @default(1) @db.TinyInt
+  dt_register     DateTime @default(now()) @db.Timestamp(0)
+  dt_updated      DateTime @default(now()) @updatedAt @db.Timestamp(0)
+  phrases         faq_question_phrases[]
+  steps           faq_highlight_steps[]
+}
+
+model faq_question_phrases {
+  id_faq_question_phrase Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_faq_question        Int      @db.UnsignedInt
+  vc_phrase              String   @db.VarChar(255)
+  dt_register            DateTime @default(now()) @db.Timestamp(0)
+  question               faq_questions @relation(fields: [id_faq_question], references: [id_faq_question], onDelete: Cascade)
+
+  @@index([id_faq_question], map: "idx_faq_question_phrases_question")
+}
+
+model faq_highlight_steps {
+  id_faq_highlight_step Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_faq_question       Int      @db.UnsignedInt
+  id_faq_screen_element Int      @db.UnsignedInt
+  i_order               Int      @default(0)
+  question              faq_questions @relation(fields: [id_faq_question], references: [id_faq_question], onDelete: Cascade)
+  element               faq_screen_elements @relation(fields: [id_faq_screen_element], references: [id_faq_screen_element])
+
+  @@index([id_faq_question, i_order], map: "idx_faq_highlight_steps_question")
+}
+
+model faq_cliente_questions {
+  id_faq_cliente_question Int      @id @default(autoincrement()) @db.UnsignedInt
+  vc_answer_text          String   @db.Text
+  i_status                Int      @default(1) @db.TinyInt
+  dt_register             DateTime @default(now()) @db.Timestamp(0)
+  dt_updated              DateTime @default(now()) @updatedAt @db.Timestamp(0)
+  vc_route                String?  @db.VarChar(100)
+  phrases                 faq_cliente_phrases[]
+}
+
+model faq_cliente_phrases {
+  id_faq_cliente_phrase   Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_faq_cliente_question Int      @db.UnsignedInt
+  vc_phrase               String   @db.VarChar(255)
+  dt_register             DateTime @default(now()) @db.Timestamp(0)
+  question                faq_cliente_questions @relation(fields: [id_faq_cliente_question], references: [id_faq_cliente_question], onDelete: Cascade)
+
+  @@index([id_faq_cliente_question], map: "idx_faq_cliente_phrases_question")
 }

@@ -13,3 +13,10 @@ export const createUserSchema = z.object({
 export const userIdParamSchema = z.object({
   id_client: z.string().regex(/^\d+$/, 'id_client debe ser un número').transform(Number),
 });
+
+export const createClientUserSchema = z.object({
+  name: z.string().min(1, 'name es requerido'),
+  lastname: z.string().min(1, 'lastname es requerido'),
+  phone: z.string().regex(/^\d{10}$/, 'El celular debe tener 10 dígitos'),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+});

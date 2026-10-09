@@ -50,7 +50,11 @@ export class DeliveryRoutes {
         route_date: Date
         id_schedule?: number | null
         id_route_template?: number | null
-        stops: { id_store: number; id_preorder?: number | null }[]
+        manana_inicio?: string | null
+        manana_fin?: string | null
+        tarde_inicio?: string | null
+        tarde_fin?: string | null
+        stops: { id_store: number; id_preorder?: number | null; turno?: 'MAÑANA' | 'TARDE' }[]
     }) {
         const driver = await prisma.drivers.findUnique({ where: { id_driver: input.id_driver } })
         if (!driver || driver.id_client !== input.id_client) throw new Error('Chofer no encontrado')
@@ -58,15 +62,31 @@ export class DeliveryRoutes {
 
         return await prisma.$transaction(async (tx) => {
             const route = await tx.delivery_routes.create({
-                data: { id_client: input.id_client, id_driver: input.id_driver, route_date: input.route_date, id_schedule: input.id_schedule ?? null, id_route_template: input.id_route_template ?? null },
+                data: {
+                    id_client: input.id_client,
+                    id_driver: input.id_driver,
+                    route_date: input.route_date,
+                    id_schedule: input.id_schedule ?? null,
+                    id_route_template: input.id_route_template ?? null,
+                    manana_inicio: input.manana_inicio ?? null,
+                    manana_fin: input.manana_fin ?? null,
+                    tarde_inicio: input.tarde_inicio ?? null,
+                    tarde_fin: input.tarde_fin ?? null,
+                },
             })
             await tx.delivery_route_stops.createMany({
                 data: input.stops.map((stop, index) => ({
                     id_route: route.id_route,
                     id_store: stop.id_store,
                     id_preorder: stop.id_preorder ?? null,
+                    turno: stop.turno === 'TARDE' ? 'TARDE' : 'MAÑANA',
                     i_order: index + 1,
                 })),
+            })
+            // Las paradas de la ruta pasan a ser establecimientos del cliente (sin duplicar).
+            await tx.client_stores.createMany({
+                data: input.stops.map((stop) => ({ id_client: input.id_client, id_store: stop.id_store })),
+                skipDuplicates: true,
             })
             return route
         })
@@ -75,7 +95,11 @@ export class DeliveryRoutes {
     async updateRoute(id_route: number, id_client: number, input: {
         id_driver: number
         route_date: Date
-        stops: { id_store: number; id_preorder?: number | null }[]
+        manana_inicio?: string | null
+        manana_fin?: string | null
+        tarde_inicio?: string | null
+        tarde_fin?: string | null
+        stops: { id_store: number; id_preorder?: number | null; turno?: 'MAÑANA' | 'TARDE' }[]
     }) {
         const existing = await prisma.delivery_routes.findUnique({ where: { id_route } })
         if (!existing || existing.id_client !== id_client) throw new Error('Ruta no encontrada')
@@ -86,7 +110,14 @@ export class DeliveryRoutes {
         return await prisma.$transaction(async (tx) => {
             await tx.delivery_routes.update({
                 where: { id_route },
-                data: { id_driver: input.id_driver, route_date: input.route_date },
+                data: {
+                    id_driver: input.id_driver,
+                    route_date: input.route_date,
+                    manana_inicio: input.manana_inicio ?? null,
+                    manana_fin: input.manana_fin ?? null,
+                    tarde_inicio: input.tarde_inicio ?? null,
+                    tarde_fin: input.tarde_fin ?? null,
+                },
             })
             await tx.delivery_route_stops.deleteMany({ where: { id_route } })
             await tx.delivery_route_stops.createMany({
@@ -94,8 +125,13 @@ export class DeliveryRoutes {
                     id_route,
                     id_store: stop.id_store,
                     id_preorder: stop.id_preorder ?? null,
+                    turno: stop.turno === 'TARDE' ? 'TARDE' : 'MAÑANA',
                     i_order: index + 1,
                 })),
+            })
+            await tx.client_stores.createMany({
+                data: input.stops.map((stop) => ({ id_client, id_store: stop.id_store })),
+                skipDuplicates: true,
             })
             return await tx.delivery_routes.findUnique({ where: { id_route } })
         })

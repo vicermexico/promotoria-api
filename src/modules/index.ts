@@ -17,6 +17,8 @@ import driversRouter from './drivers/drivers.routes'
 import deliveryRoutesRouter from './delivery-routes/delivery-routes.routes'
 import routeTemplatesRouter from './route-templates/route-templates.routes'
 import routeSchedulesRouter from './route-schedules/route-schedules.routes'
+import introVideosRouter from './intro-videos/intro-videos.routes'
+import faqRouter from './faq/faq.routes'
 
 export {
     clientRouter,
@@ -38,4 +40,6 @@ export {
     deliveryRoutesRouter,
     routeTemplatesRouter,
     routeSchedulesRouter,
+    introVideosRouter,
+    faqRouter,
 }

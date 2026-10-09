@@ -1,3 +1,5 @@
+import { aplicarTenant, aplicarTenantRecursos, tenantQueryBody, forzarMiCliente, vigilarPromotores, vigilarSoloSuper } from "./core/middleware/tenant.middleware";
+import { authMiddleware as authGuardia } from "./core/middleware";
 import "dotenv/config"
 import cors from "cors"
 import helmet from "helmet"
@@ -8,8 +10,11 @@ import { initializeBullBoard, serverAdapter } from "./queues/helpers/bullboard"
 
 import adminRouter from "./app_admin/index"
 import superadminRouter from "./app_superadmin/index"
+import staffRouter from "./modules/staff/staff.routes"
+import faqClienteRouter from "./modules/faq-cliente/faq-cliente.routes";
+import { vigilarEquipo } from "./modules/staff/permisos.guard";
 import mobileRouter from "./app_mobile/index"
-import { clientRouter, productRouter, userAdminRouter, storeRouter, channelsSalesRouter, promoterRouter, questionRouter, requestRouter, orderRouter, taskRouter, financesRouter, taskSettingsRouter, appConfigRouter, stockRouter, preorderRouter, driversRouter, deliveryRoutesRouter, routeTemplatesRouter, routeSchedulesRouter } from './modules'
+import { clientRouter, productRouter, userAdminRouter, storeRouter, channelsSalesRouter, promoterRouter, questionRouter, requestRouter, orderRouter, taskRouter, financesRouter, taskSettingsRouter, appConfigRouter, stockRouter, preorderRouter, driversRouter, deliveryRoutesRouter, routeTemplatesRouter, routeSchedulesRouter, introVideosRouter, faqRouter } from './modules'
 import promoterSelfPaymentsRouter from './modules/promoter-payments-self/promoter-self-payments.routes'
 import { errorHandler } from "./core/middleware"
 import { setupSwagger } from "./config/swagger"
@@ -47,9 +52,58 @@ startReviewTimeoutScheduler()
 startOrderAutoCloseScheduler()
 startRouteScheduleScheduler()
 
-app.use("/retailink-api/superadmin", superadminRouter)
-app.use("/retailink-api/admin", adminRouter)
-app.use("/retailink-api/mobile", mobileRouter)
+// Guardia de sesión para los grupos que antes estaban abiertos.
+// Solo estas rutas pueden usarse SIN iniciar sesión.
+const PUBLICAS: Record<string, RegExp[]> = {
+  admin: [
+    /^POST \/login$/,
+    /^GET \/check-phone\/[^/]+$/,
+    /^POST \/restore-password$/,
+    /^POST \/reset-password$/,
+    /^GET \/countries$/,
+    /^GET \/states\/\d+$/,
+    /^GET \/cities\/\d+\/\d+$/,
+  ],
+  superadmin: [/^POST \/login$/],
+  mobile: [/^GET \/$/],
+};
+// Pasar a true cuando el log confirme que ningun cliente usa rutas de superadmin.
+const BLOQUEAR_ROL = true;
+const guardia = (grupo: string) => (req: any, res: any, next: any) => {
+  if (req.method === "OPTIONS") return next();
+  const clave = `${req.method} ${req.path}`;
+  if ((PUBLICAS[grupo] || []).some((r) => r.test(clave))) return next();
+  if (grupo !== "superadmin") return authGuardia(req, res, next);
+  return authGuardia(req, res, () => {
+    if (req.user?.i_rol !== 1) {
+      const ruta = String(req.originalUrl).split("?")[0].replace(/\/\d+/g, "/:n");
+      console.warn(`[ROL-NO-SUPER] rol=${req.user?.i_rol} ${req.method} ${ruta}`);
+      if (BLOQUEAR_ROL) return res.status(403).json({ ok: false, message: "No tienes permiso para esta acción" });
+    }
+    next();
+  });
+};
+
+// Modo vigilancia: solo anota las llamadas sin credencial, NO bloquea nada.
+app.use("/retailink-api", (req: any, _res: any, next: any) => {
+  if (!req.headers.authorization) {
+    const ruta = String(req.originalUrl).split("?")[0].replace(/\/\d+/g, "/:n");
+    console.warn(`[SIN-SESION] ${req.method} ${ruta}`);
+  }
+  next();
+});
+// Aislamiento entre clientes (modo vigilancia: ver TENANT_BLOQUEAR)
+app.use("/retailink-api", tenantQueryBody);
+app.use("/retailink-api", forzarMiCliente);
+app.use("/retailink-api", vigilarPromotores);
+app.use("/retailink-api", vigilarSoloSuper);
+app.use("/retailink-api", vigilarEquipo);
+[superadminRouter, adminRouter, mobileRouter, userAdminRouter, productRouter, clientRouter, storeRouter, channelsSalesRouter, promoterRouter, questionRouter, requestRouter, orderRouter, taskRouter, financesRouter, taskSettingsRouter, appConfigRouter, promoterSelfPaymentsRouter, stockRouter, preorderRouter, routeTemplatesRouter, routeSchedulesRouter, driversRouter, deliveryRoutesRouter, introVideosRouter, faqRouter].forEach((r) => { aplicarTenant(r); aplicarTenantRecursos(r); })
+
+app.use("/retailink-api/superadmin/staff", guardia("superadmin"), staffRouter);
+app.use("/retailink-api/superadmin", guardia("superadmin"), superadminRouter)
+app.use("/retailink-api/admin", guardia("admin"), adminRouter)
+app.use("/retailink-api/mobile", guardia("mobile"), mobileRouter)
 
 app.use("/retailink-api/users", userAdminRouter)
 app.use("/retailink-api/products", productRouter)
@@ -71,6 +125,9 @@ app.use("/retailink-api/route-templates", routeTemplatesRouter)
 app.use("/retailink-api/route-schedules", routeSchedulesRouter)
 app.use("/retailink-api/drivers", driversRouter)
 app.use("/retailink-api/delivery-routes", deliveryRoutesRouter)
+app.use("/retailink-api/intro-videos", introVideosRouter)
+app.use("/retailink-api/faq", faqRouter)
+app.use("/retailink-api/faq-cliente", faqClienteRouter);
 
 // Manejo global de errores (multer, no controlados): debe ir después de todas las rutas.
 app.use(errorHandler)

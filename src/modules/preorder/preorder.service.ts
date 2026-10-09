@@ -1,5 +1,6 @@
 import { prisma } from '../../core/prisma'
 import { StorageService } from '../../services/storage.service'
+import { RouteScheduleService } from '../route-schedules/route-schedules.service'
 
 interface PreorderItemInput {
     id_product: number
@@ -7,6 +8,7 @@ interface PreorderItemInput {
 }
 
 export class Preorder {
+    private routeScheduleService = new RouteScheduleService()
 
     /**
      * Confirma que la tarea pertenece a una solicitud con el extra
@@ -20,6 +22,7 @@ export class Preorder {
                 request: {
                     select: {
                         b_preorder: true,
+                        preorder_date_mode: true,
                         request_products: { select: { id_product: true } },
                     }
                 },
@@ -42,6 +45,36 @@ export class Preorder {
      * configurado en la tienda, aunque sean de otras solicitudes/clientes).
      * Regresa solo los productos donde falte (quantity < minimum).
      */
+    /**
+     * En que ruta y turno esta metida la tienda de esta tarea, para el
+     * cliente de esta tarea -- lo usa la app cuando el encargado elige
+     * "fecha cerrada" al levantar el prepedido, en vez de que el mismo
+     * encargado escoja manana/tarde a mano.
+     */
+    /**
+     * Para que la app sepa, antes de levantar el pedido, si a esta tarea le
+     * toca "Fecha cerrada" (fecha/turno calculados solos segun la ruta
+     * asignada a la tienda) o "Fecha abierta" (se piden a mano, como antes).
+     * Tambien cae en "ABIERTA" si la solicitud es CERRADA pero la tienda no
+     * tiene ruta asignada.
+     */
+    async getDeliveryTurno(id_task: number) {
+        const task = await this.getTaskWithPreorderCheck(id_task)
+
+        if (task.request?.preorder_date_mode !== 'CERRADA') {
+            return { mode: 'ABIERTA' as const }
+        }
+
+        const schedule = await this.routeScheduleService.findActiveScheduleForStore(task.id_store)
+        if (!schedule) {
+            return { mode: 'ABIERTA' as const }
+        }
+
+        const date = this.routeScheduleService.computeNextDeliveryDate(schedule)
+        const time = schedule.turno === 'MANANA' ? 'MAÑANA' : 'TARDE'
+        return { mode: 'CERRADA' as const, preferred_date: date, preferred_time: time }
+    }
+
     async getShortfall(id_task: number) {
         const task = await this.getTaskWithPreorderCheck(id_task)
 
@@ -99,8 +132,8 @@ export class Preorder {
     async createPreorder(input: {
         id_task: number
         manager_whatsapp: string
-        preferred_date: Date
-        preferred_time: 'MAÑANA' | 'TARDE'
+        preferred_date?: Date
+        preferred_time?: 'MAÑANA' | 'TARDE'
         signature: { buffer: Buffer; mime: string }
         items: PreorderItemInput[]
     }) {
@@ -111,6 +144,33 @@ export class Preorder {
 
         if (!input.items || input.items.length === 0) {
             throw new Error('El pedido debe tener al menos un producto')
+        }
+
+        // "Fecha cerrada": si la tienda de esta tarea esta en una ruta con
+        // asignacion automatica activa, la fecha/turno de entrega se
+        // calculan solos. Si no tiene ruta asignada, se cae en fecha
+        // abierta (se piden fecha/turno a mano, igual que antes).
+        let finalDate: Date
+        let finalTime: 'MAÑANA' | 'TARDE'
+
+        if (task.request?.preorder_date_mode === 'CERRADA') {
+            const schedule = await this.routeScheduleService.findActiveScheduleForStore(task.id_store)
+            if (schedule) {
+                finalDate = this.routeScheduleService.computeNextDeliveryDate(schedule)
+                finalTime = schedule.turno === 'MANANA' ? 'MAÑANA' : 'TARDE'
+            } else {
+                if (!input.preferred_date || !input.preferred_time) {
+                    throw new Error('Esta tienda no tiene ruta asignada; selecciona fecha y turno manualmente')
+                }
+                finalDate = input.preferred_date
+                finalTime = input.preferred_time
+            }
+        } else {
+            if (!input.preferred_date || !input.preferred_time) {
+                throw new Error('Debes indicar la fecha y el turno preferidos')
+            }
+            finalDate = input.preferred_date
+            finalTime = input.preferred_time
         }
 
         const { url: signatureUrl } = await StorageService.uploadAsset({
@@ -128,8 +188,8 @@ export class Preorder {
                     id_task: input.id_task,
                     manager_whatsapp: input.manager_whatsapp,
                     manager_signature: signatureUrl,
-                    preferred_date: input.preferred_date,
-                    preferred_time: input.preferred_time,
+                    preferred_date: finalDate,
+                    preferred_time: finalTime,
                 },
             })
 

@@ -1,3 +1,4 @@
+import { promotoresPresentes, mezclarPresentes } from "../stores/presencia"
 import { prisma } from '../../core/prisma'
 
 export type StockSemaphore = 'red' | 'yellow' | 'green' | null
@@ -275,6 +276,7 @@ export class Stock {
             }),
         ])
 
+        const presentes = await promotoresPresentes(prisma)
         const addressByStore = new Map(addresses.map(a => [a.entity_id, a]))
         const readingsByStore = new Map<number, typeof readings>()
         for (const r of readings) {
@@ -343,7 +345,7 @@ export class Stock {
                         : null,
                     semaphore: worst,
                     products,
-                    active_promoters: promoters,
+                    active_promoters: mezclarPresentes(promoters, presentes, address, !!filters.id_client),
                 }
             })
             .filter((s): s is NonNullable<typeof s> => s !== null)

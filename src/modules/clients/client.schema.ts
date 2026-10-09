@@ -15,6 +15,10 @@ export const createClientSchema = z.object({
   neighborhood: z.string().optional(),
   zip: z.string().optional(),
   addiccional_notes: z.string().optional(),
+  owner_name: z.string().optional(),
+  owner_lastname: z.string().optional(),
+  owner_phone: z.string().regex(/^\d{10}$/, 'El celular del dueño debe tener 10 dígitos').optional().or(z.literal('')),
+  owner_password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').optional().or(z.literal('')),
 });
 
 export const clientIdParamSchema = z.object({

@@ -3,6 +3,16 @@ import { Preorder } from './preorder.service'
 
 const preorderService = new Preorder()
 
+export const getDeliveryTurno = async (req: Request, res: Response) => {
+    try {
+        const id_task = Number(req.params.id_task)
+        const data = await preorderService.getDeliveryTurno(id_task)
+        res.status(200).json({ ok: true, error: 0, data, message: 'Turno obtenido exitosamente' })
+    } catch (error) {
+        res.status(500).json({ ok: false, error: 1, data: null, message: (error as any).message || 'Error al obtener el turno' })
+    }
+}
+
 export const getPreorderShortfall = async (req: Request, res: Response) => {
     try {
         const id_task = Number(req.params.id_task)
@@ -24,7 +34,7 @@ export const createPreorder = async (req: Request, res: Response) => {
             res.status(400).json({ ok: false, error: 1, data: null, message: 'La firma es requerida' })
             return
         }
-        if (preferred_time !== 'MAÑANA' && preferred_time !== 'TARDE') {
+        if (preferred_time && preferred_time !== 'MAÑANA' && preferred_time !== 'TARDE') {
             res.status(400).json({ ok: false, error: 1, data: null, message: 'preferred_time debe ser MAÑANA o TARDE' })
             return
         }
@@ -34,8 +44,8 @@ export const createPreorder = async (req: Request, res: Response) => {
         const preorder = await preorderService.createPreorder({
             id_task,
             manager_whatsapp,
-            preferred_date: new Date(preferred_date),
-            preferred_time,
+            preferred_date: preferred_date ? new Date(preferred_date) : undefined,
+            preferred_time: preferred_time || undefined,
             signature: { buffer: req.file.buffer, mime: req.file.mimetype },
             items: parsedItems,
         })

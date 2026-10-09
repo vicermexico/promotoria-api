@@ -1,7 +1,8 @@
 import { Router } from 'express'
-import { getAllUsersByClientId, createUser, refreshToken } from './controller'
-import { authMiddleware, validateBody } from "../../core/middleware"
-import { createUserSchema } from './user.schema'
+import { getAllUsersByClientId, createUser, createClientUser, refreshToken } from './controller'
+import { authMiddleware, requireRole, validateBody } from "../../core/middleware"
+import { ROLES } from "../../core/constants/status.constants"
+import { createUserSchema, createClientUserSchema } from './user.schema'
 
 const userAdminRouter = Router()
 
@@ -34,7 +35,32 @@ const userAdminRouter = Router()
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       500: { $ref: '#/components/responses/ServerError' }
  */
-userAdminRouter.post('/', authMiddleware, validateBody(createUserSchema), createUser)
+userAdminRouter.post('/', authMiddleware, requireRole(ROLES.SUPER), validateBody(createUserSchema), createUser)
+
+/**
+ * @openapi
+ * /users/client-user:
+ *   post:
+ *     tags: [Users]
+ *     summary: El administrador de un cliente da de alta un usuario de su propio negocio
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, lastname, phone, password]
+ *             properties:
+ *               name: { type: string }
+ *               lastname: { type: string }
+ *               phone: { type: string, description: "10 dígitos; es el usuario para iniciar sesión" }
+ *               password: { type: string, minLength: 6 }
+ *     responses:
+ *       201: { description: "Usuario creado." }
+ *       400: { description: "Datos inválidos o celular ya registrado." }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
+userAdminRouter.post('/client-user', authMiddleware, requireRole(ROLES.ADMIN), requireClientOwner, validateBody(createClientUserSchema), createClientUser)
 
 /**
  * @openapi
@@ -72,8 +98,17 @@ userAdminRouter.get('/refresh-token', refreshToken)
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       500: { $ref: '#/components/responses/ServerError' }
  */
-userAdminRouter.get('/:id_client', authMiddleware, getAllUsersByClientId)
+userAdminRouter.get('/:id_client', authMiddleware, requireRole(ROLES.SUPER), getAllUsersByClientId)
 
 
 
 export default userAdminRouter
+
+import { registerClientUserRoutes } from './client-users.routes';
+registerClientUserRoutes(userAdminRouter);
+
+import { registerClientProfileRoutes } from './client-profile.routes';
+registerClientProfileRoutes(userAdminRouter);
+import { requireClientOwner } from './client-owner.middleware';
+import { registerSuperClientUserRoutes } from './client-users-super.routes';
+registerSuperClientUserRoutes(userAdminRouter);

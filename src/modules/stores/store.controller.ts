@@ -32,7 +32,7 @@ export const createStore = async (req: Request, res: Response) => {
 export const getStore = async (req: Request, res: Response) => {
     const { id_store } = req.params
     try {
-        const store = await storeService.getStore(Number(id_store))
+        const store = quitarCreador(req, await storeService.getStore(Number(id_store)))
         res.status(200).json({
             ok: true,
             error: 0,
@@ -50,6 +50,20 @@ export const getStore = async (req: Request, res: Response) => {
     }
 }
 
+// A los usuarios del panel de un cliente no se les manda id_user (quien dio de alta
+// la tienda): es un dato interno. Super admin y app del promotor lo reciben igual.
+const quitarCreador = (req: Request, data: any): any => {
+    const u: any = (req as any).user
+    const esPanelCliente = u && !u.phone && u.i_rol === 2
+    if (!esPanelCliente) return data
+    const limpiar = (t: any) => {
+        if (!t || typeof t !== 'object') return t
+        const { id_user, ...resto } = t
+        return resto
+    }
+    return Array.isArray(data) ? data.map(limpiar) : limpiar(data)
+}
+
 export const getStores = async (req: Request, res: Response) => {
     try {
         // ?mine=1 filtra a solo las tiendas que ya son del cliente que hace
@@ -58,7 +72,7 @@ export const getStores = async (req: Request, res: Response) => {
         // directorio completo compartido.
         const mine = req.query.mine === '1' || req.query.mine === 'true'
         const id_client = mine ? req.user?.id_client : undefined
-        const stores = await storeService.getStores(id_client)
+        const stores = quitarCreador(req, await storeService.getStores(id_client))
         res.status(200).json({
             ok: true,
             error: 0,

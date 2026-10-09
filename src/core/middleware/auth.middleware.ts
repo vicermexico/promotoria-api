@@ -62,6 +62,27 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         }
       }
 
+      // Cuentas del panel suspendidas o eliminadas: se corta la sesión abierta.
+      if (!(decoded as any)?.phone && (decoded as any)?.id && (decoded as any)?.email) {
+        const panelUser = await prisma.users.findUnique({
+          where: { id_user: Number((decoded as any).id) },
+          select: { email: true, i_status: true },
+        })
+        if (panelUser) {
+          const tokenEmail = String((decoded as any).email)
+          const suspendido = panelUser.i_status === 0 && panelUser.email === tokenEmail
+          const eliminado = panelUser.i_status === 2 && panelUser.email.startsWith(tokenEmail + '#del')
+          if (suspendido || eliminado) {
+            res.status(401).json({
+              ok: false,
+              data: null,
+              message: 'Tu cuenta está suspendida o fue eliminada. Contacta al administrador de tu negocio.'
+            });
+            return;
+          }
+        }
+      }
+
       req.user = decoded;
 
       next();

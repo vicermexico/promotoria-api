@@ -64,6 +64,8 @@ export interface UpdatePromoterProfileDTO {
     lastname?: string
     email?: string
     phone?: string
+    b_show_intro_videos?: boolean
+    vc_gender?: string
 }
 
 export interface UpdatePromoterPasswordDTO {

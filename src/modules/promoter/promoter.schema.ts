@@ -68,6 +68,8 @@ export const updatePromoterProfileSchema = z.object({
   lastname: z.string().optional(),
   email: z.string().email('email debe ser válido').optional().or(z.literal('')),
   phone: z.string().min(1, 'phone no puede estar vacío').optional(),
+  b_show_intro_videos: z.boolean().optional(),
+  vc_gender: z.enum(['M', 'F']).optional(),
 });
 
 export const updatePromoterPasswordSchema = z.object({

@@ -154,6 +154,8 @@ export class Promoter {
                 ...(data.lastname !== undefined ? { lastname: data.lastname } : {}),
                 ...(data.email !== undefined ? { email: data.email || null } : {}),
                 ...(data.phone !== undefined ? { phone: data.phone } : {}),
+                ...(data.b_show_intro_videos !== undefined ? { b_show_intro_videos: data.b_show_intro_videos } : {}),
+                ...(data.vc_gender !== undefined ? { vc_gender: data.vc_gender } : {}),
                 dt_updated: new Date().toISOString(),
             },
         })

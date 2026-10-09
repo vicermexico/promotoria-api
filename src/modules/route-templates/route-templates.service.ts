@@ -1,20 +1,28 @@
 import { prisma } from '../../core/prisma'
 
+export type RouteTemplateStoreInput = { id_store: number; turno: 'MAÑANA' | 'TARDE' }
+
 export class RouteTemplateService {
-    async create(data: { id_client: number; name: string; storeIds: number[] }) {
-        return await prisma.route_templates.create({
+    async create(data: { id_client: number; name: string; stores: RouteTemplateStoreInput[] }) {
+        const tpl = await prisma.route_templates.create({
             data: {
                 id_client: data.id_client,
                 name: data.name,
                 stores: {
-                    create: data.storeIds.map((id_store) => ({ id_store })),
+                    create: data.stores.map((s) => ({ id_store: s.id_store, turno: s.turno })),
                 },
             },
             include: { stores: true },
         })
+        // Las tiendas de la ruta pasan a ser establecimientos del cliente (sin duplicar).
+        await prisma.client_stores.createMany({
+            data: data.stores.map((s) => ({ id_client: data.id_client, id_store: s.id_store })),
+            skipDuplicates: true,
+        })
+        return tpl
     }
 
-    async update(id_route_template: number, data: { name: string; storeIds: number[] }) {
+    async update(id_route_template: number, data: { name: string; stores: RouteTemplateStoreInput[] }) {
         return await prisma.$transaction(async (tx) => {
             await tx.route_templates.update({
                 where: { id_route_template },
@@ -24,13 +32,34 @@ export class RouteTemplateService {
             // calcular un diff -- una ruta no suele tener cientos de tiendas.
             await tx.route_template_stores.deleteMany({ where: { id_route_template } })
             await tx.route_template_stores.createMany({
-                data: data.storeIds.map((id_store) => ({ id_route_template, id_store })),
+                data: data.stores.map((s) => ({ id_route_template, id_store: s.id_store, turno: s.turno })),
             })
+            const dueno = await tx.route_templates.findUnique({ where: { id_route_template }, select: { id_client: true } })
+            if (dueno) {
+                await tx.client_stores.createMany({
+                    data: data.stores.map((s) => ({ id_client: dueno.id_client, id_store: s.id_store })),
+                    skipDuplicates: true,
+                })
+            }
             return await tx.route_templates.findUnique({
                 where: { id_route_template },
                 include: { stores: true },
             })
         })
+    }
+
+    /**
+     * En que ruta y turno (MAÑANA/TARDE) esta metida esta tienda, para
+     * este cliente -- lo usa el prepedido cuando el encargado elige
+     * "fecha cerrada" en vez de escoger el turno a mano.
+     */
+    async getStoreTurno(id_client: number, id_store: number) {
+        const entry = await prisma.route_template_stores.findFirst({
+            where: { id_store, route_template: { id_client } },
+            select: { turno: true, route_template: { select: { name: true } } },
+        })
+        if (!entry) return { has_route: false, turno: null, route_name: null }
+        return { has_route: true, turno: entry.turno, route_name: entry.route_template.name }
     }
 
     async getAllByClient(id_client: number) {

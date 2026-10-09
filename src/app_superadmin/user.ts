@@ -55,6 +55,11 @@ export class User {
         throw new Error("Contraseña incorrecta");
       }
 
+      const estadoCuenta = (user as any).i_status;
+      if (estadoCuenta === 0 || estadoCuenta === 2) {
+        throw new Error("CUENTA_SUSPENDIDA");
+      }
+
       const tokenPayload: TokenPayload = {
         id: user.id_user!,
         email: user.email,
@@ -141,7 +146,7 @@ export class User {
   async getUserByEmail(email: string): Promise<IUser> {
     try {
       const [result]: any[] = await this.db.query(
-        "SELECT id_user, email, password, i_rol, dt_register, dt_updated, name, lastname, id_client, must_change_password FROM users WHERE email = ? LIMIT 1",
+        "SELECT id_user, email, password, i_rol, i_status, dt_register, dt_updated, name, lastname, id_client, must_change_password, vc_permisos FROM users WHERE email = ? LIMIT 1",
         [email],
       );
       const user_finded = result[0];
@@ -250,6 +255,28 @@ export class User {
     } catch (error) {
       throw error;
     }
+  }
+
+  /**
+   * Cambio obligatorio de contraseña (primer acceso o reseteo): no pide la
+   * contraseña actual, pero SOLO funciona si la cuenta está marcada con
+   * must_change_password = 1.
+   */
+  async forceChangePassword(userId: number, newPassword: string) {
+    const [result]: any[] = await this.db.query(
+      "SELECT id_user, must_change_password FROM users WHERE id_user = ? LIMIT 1",
+      [userId],
+    );
+    const user = result[0];
+    if (!user) {
+      throw new Error("Usuario no encontrado");
+    }
+    if (!user.must_change_password) {
+      throw new Error("NO_REQUIERE_CAMBIO");
+    }
+    const hashedPassword = await Utils.hash_password(newPassword);
+    await this.updatePassword(userId, hashedPassword);
+    return { message: "Contraseña actualizada exitosamente" };
   }
 
   async updatePassword(userId: number, hashedPassword: string) {

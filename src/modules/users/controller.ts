@@ -79,6 +79,43 @@ export const createUser =  async (req: Request, res: Response) => {
 
 }
 
+export const createClientUser = async (req: Request, res: Response) => {
+  try {
+    const { name, lastname, phone, password } = req.body;
+    // Siempre dentro del negocio de quien lo crea: jamás se toma de lo que mande el navegador.
+    const id_client = Number(req.user!.id_client);
+    const id_user = Number(req.user!.id);
+
+    const existing = await userAdminDTO.findByLogin(phone);
+    if (existing) {
+      return res.status(400).json({
+        ok: false,
+        error: 1,
+        data: null,
+        message: 'Ese número de celular ya está registrado'
+      });
+    }
+
+    const newUser = await userAdminDTO.createClientUser({ phone, name, lastname, password, id_client, id_user_creator: id_user });
+    await logsDTO.createUserLog(`Usuario ${phone} creado desde Mi Negocio`, id_user);
+
+    res.status(201).json({
+      ok: true,
+      error: 0,
+      data: newUser,
+      message: 'Usuario creado exitosamente'
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ok: false,
+      error: 1,
+      data: null,
+      message: 'Error al crear el usuario'
+    });
+  }
+}
+
 export const refreshToken = async(req: Request, res: Response) => {
   try {
     const authHeader = req.headers['authorization'];

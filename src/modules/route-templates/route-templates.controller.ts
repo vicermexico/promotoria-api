@@ -5,15 +5,15 @@ const service = new RouteTemplateService()
 
 export const createRouteTemplate = async (req: Request, res: Response) => {
     try {
-        const { id_client, name, storeIds } = req.body
-        if (!id_client || !name || !Array.isArray(storeIds) || storeIds.length === 0) {
+        const { id_client, name, stores } = req.body
+        if (!id_client || !name || !Array.isArray(stores) || stores.length === 0) {
             res.status(400).json({ ok: false, error: 1, data: null, message: 'Faltan datos: cliente, nombre y al menos una tienda' })
             return
         }
         const template = await service.create({
             id_client: Number(id_client),
             name: String(name).trim(),
-            storeIds: storeIds.map(Number),
+            stores: stores.map((s: any) => ({ id_store: Number(s.id_store), turno: s.turno === 'TARDE' ? 'TARDE' : 'MAÑANA' })),
         })
         res.status(201).json({ ok: true, error: 0, data: template, message: 'Ruta creada exitosamente' })
     } catch (error) {
@@ -25,14 +25,14 @@ export const createRouteTemplate = async (req: Request, res: Response) => {
 export const updateRouteTemplate = async (req: Request, res: Response) => {
     try {
         const id_route_template = Number(req.params.id_route_template)
-        const { name, storeIds } = req.body
-        if (!name || !Array.isArray(storeIds) || storeIds.length === 0) {
+        const { name, stores } = req.body
+        if (!name || !Array.isArray(stores) || stores.length === 0) {
             res.status(400).json({ ok: false, error: 1, data: null, message: 'Faltan datos: nombre y al menos una tienda' })
             return
         }
         const template = await service.update(id_route_template, {
             name: String(name).trim(),
-            storeIds: storeIds.map(Number),
+            stores: stores.map((s: any) => ({ id_store: Number(s.id_store), turno: s.turno === 'TARDE' ? 'TARDE' : 'MAÑANA' })),
         })
         res.status(200).json({ ok: true, error: 0, data: template, message: 'Ruta actualizada exitosamente' })
     } catch (error) {

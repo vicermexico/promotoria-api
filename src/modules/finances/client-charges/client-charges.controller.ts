@@ -124,6 +124,21 @@ export const getInvoiceById = async (req: Request, res: Response) => {
     }
 }
 
+export const getPendingOrders = async (req: Request, res: Response) => {
+    try {
+        const id_client = req.user!.i_rol === ROLES.ADMIN ? req.user!.id_client : parseNumber(req.query.id_client)
+        if (id_client === undefined) {
+            res.status(400).json({ ok: false, error: 1, data: null, message: 'id_client es requerido' })
+            return
+        }
+        const result = await clientChargesService.getPendingOrders(id_client)
+        res.status(200).json({ ok: true, error: 0, data: result, message: 'Pedidos por facturar obtenidos exitosamente' })
+    } catch (error) {
+        console.error('GET PENDING ORDERS ERROR:', (error as any).message)
+        res.status(500).json({ ok: false, error: 1, data: null, message: 'Error al obtener los pedidos por facturar', error_backend: error })
+    }
+}
+
 export const submitInvoicePayment = async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id_invoice)

@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt'
 import { prisma } from '../../core/prisma'
 import { Store } from '../stores/store.service'
+import { crearOVincularTienda } from '../stores/client-stores.routes'
 
 export class Drivers {
     async create(input: { id_client: number; name: string; phone: string; email?: string; password: string }) {
@@ -110,8 +111,7 @@ export class Drivers {
 
         const mexico = await prisma.countries.findFirst({ where: { name: { contains: 'exico' } } })
 
-        const storeService = new Store()
-        return await storeService.createStore({
+        const { store, ya_existia } = await crearOVincularTienda(driver.id_client, {
             id_user: representante.id_user,
             id_channel_sale: input.id_channel_sale,
             name: input.name,
@@ -129,6 +129,7 @@ export class Drivers {
                 longitude: input.longitude,
             },
         })
+        return { ...store, ya_existia }
     }
 
     async changePassword(id_driver: number, current_password: string, new_password: string) {

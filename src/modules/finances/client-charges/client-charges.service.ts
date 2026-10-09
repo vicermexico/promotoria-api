@@ -282,6 +282,54 @@ export class ClientCharges {
         return { ...invoice, tasks, evidences, logs }
     }
 
+    async getPendingOrders(id_client: number) {
+        const tasks = await prisma.tasks.findMany({
+            where: {
+                id_status: 7,
+                id_invoice: null,
+                id_request: { not: null },
+                id_client,
+                order: { id_status: ORDER_STATUS.CERRADO },
+            },
+            include: { order: true }
+        })
+
+        if (tasks.length === 0) return []
+
+        const orderIds = [...new Set(tasks.map(t => t.id_order))]
+        const orderItems = await prisma.order_items.findMany({
+            where: { id_order: { in: orderIds } },
+            select: { id_order: true, id_request: true, id_store: true, f_value: true }
+        })
+        const valueMap = new Map<string, number>()
+        for (const oi of orderItems) {
+            valueMap.set(`${oi.id_order}:${oi.id_request}:${oi.id_store}`, Number(oi.f_value))
+        }
+
+        const byOrder = new Map<number, { order: any, f_amount: number, task_count: number }>()
+        for (const t of tasks) {
+            const key = `${t.id_order}:${t.id_request}:${t.id_store}`
+            const f_amount = valueMap.get(key)
+            if (f_amount === undefined) {
+                console.warn(`No se encontró order_item para la tarea ${t.id_task} (${key}), se excluye de pendientes por facturar`)
+                continue
+            }
+            if (!byOrder.has(t.id_order)) {
+                byOrder.set(t.id_order, { order: t.order, f_amount: 0, task_count: 0 })
+            }
+            const entry = byOrder.get(t.id_order)!
+            entry.f_amount += f_amount
+            entry.task_count += 1
+        }
+
+        return [...byOrder.entries()].map(([id_order, data]) => ({
+            id_order,
+            f_amount: data.f_amount,
+            task_count: data.task_count,
+            order: data.order,
+        }))
+    }
+
     async updateInvoiceDueDate(id: number, dt_due: Date, id_user: number) {
         const invoice = await prisma.client_charge_orders.findUnique({ where: { id } })
         if (!invoice) throw new Error('Factura no encontrada')

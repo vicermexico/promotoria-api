@@ -106,6 +106,7 @@ export class Request {
                     f_value,
                     url_rack_image: data.url_rack_image,
                     b_preorder: data.b_preorder ?? false,
+                    preorder_date_mode: data.preorder_date_mode ?? 'ABIERTA',
                 }
             })
 
@@ -302,6 +303,7 @@ export class Request {
                     url_rack_image: data.url_rack_image,
                     id_status: data.id_status,
                     b_preorder: data.b_preorder,
+                    preorder_date_mode: data.preorder_date_mode,
                     dt_update: new Date(),
                 }
             })

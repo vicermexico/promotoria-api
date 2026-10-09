@@ -25,7 +25,7 @@ export const createClient = async(req: Request, res: Response) => {
             ok: false,
             error: 1,
             data: null,
-            message: 'Error al crear el cliente'
+            message: (error as Error)?.message === 'OWNER_PHONE_EXISTS' ? 'Ese celular ya está registrado como usuario' : 'Error al crear el cliente'
         });
     }
 }
@@ -78,7 +78,11 @@ export const getClient = async (req: Request, res: Response) => {
 export const getClientsList = async (req: Request, res: Response) => {
     try {
         
-        const clients = await clientService.getClientsList();
+        const todos = await clientService.getClientsList();
+        const u: any = req.user;
+        const clients = (u && !u.phone && u.i_rol === 2)
+            ? (todos as any[]).filter((x: any) => x.id_client === u.id_client)
+            : todos;
 
         return res.json({
             ok: true,

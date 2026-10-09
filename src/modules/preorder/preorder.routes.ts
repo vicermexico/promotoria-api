@@ -2,7 +2,7 @@ import { Router } from 'express'
 
 import { authMiddleware } from '../../core/middleware'
 import { upload } from '../../core/middleware/upload.middleware'
-import { getPreorderShortfall, createPreorder, getPreorder, getPreordersByClient, updatePreorderStatus } from './preorder.controller'
+import { getPreorderShortfall, createPreorder, getPreorder, getPreordersByClient, updatePreorderStatus, getDeliveryTurno } from './preorder.controller'
 
 const preorderRouter = Router()
 
@@ -15,6 +15,7 @@ preorderRouter.get('/clients/:id_client', authMiddleware, getPreordersByClient)
 // tienda de esta tarea. Solo funciona si la solicitud tiene el extra
 // "Prepedido" activado.
 preorderRouter.get('/tasks/:id_task/shortfall', authMiddleware, getPreorderShortfall)
+preorderRouter.get('/tasks/:id_task/delivery-turno', authMiddleware, getDeliveryTurno)
 
 // Pedido acordado con el encargado/dueño de la tienda: productos+cantidades,
 // su WhatsApp, dia/turno de entrega, y su firma electronica (imagen).

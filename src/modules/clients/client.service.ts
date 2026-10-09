@@ -1,3 +1,4 @@
+import { Utils } from "../../core/utils";
 import { prisma } from "@/core/prisma";
 
 import { createClientData } from "./client.dto";
@@ -46,6 +47,24 @@ export class Client {
                     }
                 });
 
+                const od: any = clientData
+                if (od.owner_phone && od.owner_password) {
+                    const ya = await prisma.users.findUnique({ where: { email: od.owner_phone }, select: { id_user: true } })
+                    if (ya) throw new Error('OWNER_PHONE_EXISTS')
+                    await prisma.users.create({
+                        data: {
+                            email: od.owner_phone,
+                            name: od.owner_name || client.name,
+                            lastname: od.owner_lastname || '-',
+                            password: await Utils.hash_password(od.owner_password),
+                            i_rol: 2,
+                            i_status: 1,
+                            must_change_password: true,
+                            id_client: client.id_client,
+                            id_user_creator: clientData.id_user,
+                        },
+                    })
+                }
                 return client;
             });
         } catch (error) {

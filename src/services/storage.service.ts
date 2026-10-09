@@ -188,6 +188,34 @@ export class StorageService {
     return { url, path: objectPath, id_asset, vc_folio };
   }
 
+  /**
+   * Sube un archivo tal cual (sin optimizar, sin registrar en `assets`) a una
+   * ruta arbitraria del bucket. Para features con su propia tabla de control
+   * (ej. clips de video de intro_video_clips), donde la semántica de
+   * "una sola version activa por entidad" de uploadAsset() no aplica porque
+   * puede haber varios archivos vigentes a la vez para la misma entidad.
+   */
+  static async uploadRawFile(buffer: Buffer, mime: string, objectPath: string): Promise<{ url: string, path: string }> {
+    const file = bucket.file(objectPath);
+    await file.save(buffer, {
+      metadata: {
+        contentType: mime,
+        cacheControl: "public, max-age=31536000",
+      },
+    });
+    const url = `https://storage.googleapis.com/${process.env.GCP_BUCKET_NAME}/${objectPath}`;
+    return { url, path: objectPath };
+  }
+
+  /** Borra un objeto del bucket. No truena si ya no existe. */
+  static async deleteRawFile(objectPath: string): Promise<void> {
+    try {
+      await bucket.file(objectPath).delete();
+    } catch (error: any) {
+      if (error?.code !== 404) throw error;
+    }
+  }
+
   private static buildKey(input: UploadAssetInput, ext: string): string {
     const segment = ENTITY_SEGMENT[input.entity];
     const prefix = input.id_client ? `clients/${input.id_client}/` : "";

@@ -1,3 +1,4 @@
+import { promotoresPresentes, distM, RADIO_PRESENCIA_M } from "./presencia"
 import { prisma } from '../../core/prisma'
 import { CreateStoreDTO } from './store.dto'
 
@@ -109,6 +110,7 @@ export class Store {
                 activePromotersByStore.get(t.id_store)!.add(t.id_promoter)
             }
 
+            const presentes = await promotoresPresentes(prisma)
             const storesWithAddress = await Promise.all(
                 stores.map(async (store) => {
                     const address = await prisma.addresses.findFirst({
@@ -135,7 +137,13 @@ export class Store {
                         }
                     })
 
-                    const i_active_promoters = activePromotersByStore.get(store.id_store)?.size ?? 0
+                    const idsActivos = new Set<number>(activePromotersByStore.get(store.id_store) ?? [])
+                    if (address && address.latitude != null && address.longitude != null) {
+                        for (const pr of presentes) {
+                            if (distM(pr.latitude, pr.longitude, Number(address.latitude), Number(address.longitude)) <= RADIO_PRESENCIA_M) idsActivos.add(pr.id)
+                        }
+                    }
+                    const i_active_promoters = idsActivos.size
 
                     return { ...store, address, i_active_promoters }
                 })

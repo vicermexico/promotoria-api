@@ -7,6 +7,9 @@ export interface CreateRequestDTO {
     /// Extra "Prepedido": si esta activo, el promotor puede levantar un
     /// pedido con el encargado de la tienda cuando falten piezas.
     b_preorder?: boolean;
+    /// Solo aplica si b_preorder es true. 'ABIERTA': el encargado elige
+    /// fecha/turno de entrega. 'CERRADA': se asigna segun la ruta del cliente.
+    preorder_date_mode?: string;
     products?: CreateRequestProductDTO[];
 }
 
@@ -18,6 +21,7 @@ export interface UpdateRequestDTO {
     url_rack_image?: string;
     id_status?: number;
     b_preorder?: boolean;
+    preorder_date_mode?: string;
     products?: UpdateRequestProductDTO[];
 }
 

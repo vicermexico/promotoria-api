@@ -33,6 +33,58 @@ export class RouteScheduleService {
     }
 
     /**
+     * Busca si esta tienda esta en alguna ruta con una asignacion automatica
+     * activa (route_template_stores -> route_templates -> route_driver_schedules).
+     * Se usa para "Fecha cerrada" de prepedidos: si la tienda tiene ruta, se
+     * calcula la fecha/turno de entrega solos; si no, se deja como fecha
+     * abierta (el encargado/promotor elige a mano).
+     */
+    async findActiveScheduleForStore(id_store: number) {
+        const link = await prisma.route_template_stores.findFirst({
+            where: { id_store },
+            include: {
+                route_template: {
+                    include: {
+                        schedules: { where: { is_active: true } },
+                    },
+                },
+            },
+        })
+        return link?.route_template.schedules[0] ?? null
+    }
+
+    /**
+     * Calcula la proxima fecha (a partir de hoy) en la que le toca entrega a
+     * esta asignacion automatica, respetando el dia de la semana, el
+     * intervalo de semanas y la fecha ancla. Mismo criterio de
+     * dias/semana que runDailyCheck() de abajo.
+     */
+    computeNextDeliveryDate(schedule: { day_of_week: number; interval_weeks: number; anchor_date: Date }, from: Date = new Date()) {
+        const fromDateOnly = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+        const jsDay = fromDateOnly.getDay()
+        const fromDayOfWeek = jsDay === 0 ? 7 : jsDay
+
+        let daysUntilTarget = schedule.day_of_week - fromDayOfWeek
+        if (daysUntilTarget <= 0) daysUntilTarget += 7
+
+        let candidate = new Date(fromDateOnly)
+        candidate.setDate(candidate.getDate() + daysUntilTarget)
+
+        const anchor = new Date(schedule.anchor_date)
+        const anchorDateOnly = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate())
+        const msPerWeek = 7 * 24 * 60 * 60 * 1000
+
+        while (true) {
+            const weeksSinceAnchor = Math.round((candidate.getTime() - anchorDateOnly.getTime()) / msPerWeek)
+            if (weeksSinceAnchor >= 0 && weeksSinceAnchor % schedule.interval_weeks === 0) {
+                return candidate
+            }
+            candidate = new Date(candidate)
+            candidate.setDate(candidate.getDate() + 7)
+        }
+    }
+
+    /**
      * Revisa todas las asignaciones automaticas activas y, para las que hoy
      * les toca (mismo dia de la semana y ya paso el numero de semanas
      * correspondiente desde su fecha ancla), crea la ruta de entrega del

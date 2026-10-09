@@ -36,6 +36,10 @@ export const createRequest = async (req: Request, res: Response) => {
         const id_user = parseNumber(body.id_user)!
         const id_client = parseNumber(body.id_client)!
 
+        if (body.preorder_date_mode && body.preorder_date_mode !== 'ABIERTA' && body.preorder_date_mode !== 'CERRADA') {
+            res.status(400).json({ ok: false, error: 1, data: null, message: "preorder_date_mode debe ser 'ABIERTA' o 'CERRADA'" })
+            return
+        }
         const payload: CreateRequestDTO = {
             id_user,
             id_client,
@@ -43,6 +47,7 @@ export const createRequest = async (req: Request, res: Response) => {
             f_value: parseNumber(body.f_value)!,
             url_rack_image: body.url_rack_image,
             b_preorder: parseBoolean(body.b_preorder),
+            preorder_date_mode: body.preorder_date_mode,
             products,
         }
 
@@ -177,6 +182,10 @@ export const updateRequest = async (req: Request, res: Response) => {
             url_rack_image = existing.url_rack_image ?? undefined
         }
 
+        if (body.preorder_date_mode && body.preorder_date_mode !== 'ABIERTA' && body.preorder_date_mode !== 'CERRADA') {
+            res.status(400).json({ ok: false, error: 1, data: null, message: "preorder_date_mode debe ser 'ABIERTA' o 'CERRADA'" })
+            return
+        }
         const payload: UpdateRequestDTO = {
             id_user: parseNumber(body.id_user),
             id_client: parseNumber(body.id_client),
@@ -185,6 +194,7 @@ export const updateRequest = async (req: Request, res: Response) => {
             url_rack_image,
             id_status: parseNumber(body.id_status),
             b_preorder: parseBoolean(body.b_preorder),
+            preorder_date_mode: body.preorder_date_mode,
             products,
         }
 

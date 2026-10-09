@@ -47,7 +47,19 @@ adminRouter.post(
       }
 
       userModel = getAdminUser();
-      const result = await userModel.loginSuperAdmin(vc_username, vc_password);
+      let result: any;
+      try {
+        result = await userModel.loginSuperAdmin(vc_username, vc_password);
+      } catch (e: any) {
+        if (e?.message === "CUENTA_SUSPENDIDA") {
+          res.status(403).json({
+            error: "Tu cuenta está suspendida. Contacta al administrador de tu negocio.",
+            message: "Tu cuenta está suspendida. Contacta al administrador de tu negocio.",
+          });
+          return;
+        }
+        throw e;
+      }
 
       console.log("Super admin inició sesión:", result);
 
@@ -374,6 +386,31 @@ adminRouter.post(
       }
 
       res.status(500).json({ error: "Error al cambiar contraseña", details: errorMessage, success: false });
+    }
+  },
+);
+
+adminRouter.post(
+  "/change-password-forced",
+  authMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { newPassword } = req.body;
+      if (!newPassword || String(newPassword).length < 6) {
+        res.status(400).json({ error: "La nueva contraseña debe tener al menos 6 caracteres", success: false });
+        return;
+      }
+      const userModel = getAdminUser();
+      const result = await userModel.forceChangePassword(req.user!.id, String(newPassword));
+      res.status(200).json({ message: result.message, success: true });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg === "NO_REQUIERE_CAMBIO") {
+        res.status(403).json({ error: "Esta cuenta no requiere un cambio obligatorio de contraseña", success: false });
+        return;
+      }
+      console.error("FORCED PASSWORD ERROR:", msg);
+      res.status(500).json({ error: "Error al cambiar contraseña", success: false });
     }
   },
 );
@@ -1943,7 +1980,12 @@ adminRouter.get('/promoters', async (req: Request, res: Response): Promise<void>
             f_longitude: p.longitude,
         }))
 
-        res.status(200).json({ ok: true, data: result });
+        const u: any = (req as any).user;
+        const esCliente = !!u && !u.phone && u.i_rol === 2;
+        const salida = esCliente
+            ? result.map(r => ({ id_promoter: r.id_promoter, vc_name: `Promotor ${r.id_promoter}`, vc_email: null, vc_phone: null, dt_register: null, b_active: r.b_active, f_latitude: r.f_latitude, f_longitude: r.f_longitude }))
+            : result;
+        res.status(200).json({ ok: true, data: salida });
     } catch (error) {
         console.error(error);
         res.status(500).json({ ok: false, error: "Error obteniendo promotores" });
