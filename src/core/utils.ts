@@ -13,7 +13,11 @@ import { prisma } from "./prisma";
 
 
 dotenv.config();
-const JWT_SECRET = process.env.JWT_SECRET || "tu_clave_secreta_super_segura";
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET
+  if (!secret || secret.length < 32) throw new Error("Falta JWT_SECRET (minimo 32 caracteres) en el .env")
+  return secret
+}
 
 export interface TokenPayload {
   id: number;
@@ -88,7 +92,7 @@ export class Utils {
 
 
   static generate_token(payload: TokenPayload | TokenPromoterPayload, _expiresIn: string = "30d"): string {
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign(payload, getJwtSecret(), {
       expiresIn: "30d",
     });
   }
@@ -96,14 +100,14 @@ export class Utils {
   // Token de larga duración (90 días) que sirve solo para pedir un token de
   // acceso nuevo cuando el actual expira. Se distingue con type:'refresh'.
   static generate_refresh_token(payload: TokenPayload | TokenPromoterPayload): string {
-    return jwt.sign({ ...payload, type: 'refresh' }, JWT_SECRET, {
+    return jwt.sign({ ...payload, type: 'refresh' }, getJwtSecret(), {
       expiresIn: "90d",
     });
   }
 
   static verify_token(token: string): Promise<TokenPayload> {
     return new Promise((resolve, reject) => {
-      jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      jwt.verify(token, getJwtSecret(), (err, decoded) => {
         if (err) {
           reject(err);
         } else {
