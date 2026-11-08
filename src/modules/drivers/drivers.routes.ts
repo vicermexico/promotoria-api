@@ -6,6 +6,7 @@ import {
 } from './drivers.controller'
 
 import { getMyAffiliation, getMyReferrals } from '../driver-referrals/driver-referrals.controller'
+import { getMyPushKey, registerMyDevice, removeMyDevice, notifyDriverFromPanel } from '../driver-push/driver-push.controller'
 import { getMyPayments, getMyBankAccount, saveMyBankAccount } from '../driver-finance/driver-finance.controller'
 
 const driversRouter = Router()
@@ -36,5 +37,10 @@ driversRouter.get('/me/referrals', authMiddleware, getMyReferrals)
 driversRouter.get('/me/payments', authMiddleware, getMyPayments)
 driversRouter.get('/me/bank-account', authMiddleware, getMyBankAccount)
 driversRouter.post('/me/bank-account', authMiddleware, saveMyBankAccount)
+// Notificaciones del chofer: registrar / quitar su celular, y mensaje desde el panel.
+driversRouter.get('/me/push-key', authMiddleware, getMyPushKey)
+driversRouter.post('/me/devices', authMiddleware, registerMyDevice)
+driversRouter.delete('/me/devices', authMiddleware, removeMyDevice)
+driversRouter.post('/:id_driver/notify', authMiddleware, notifyDriverFromPanel)
 
 export default driversRouter

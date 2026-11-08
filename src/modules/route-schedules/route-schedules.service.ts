@@ -1,4 +1,5 @@
 import { prisma } from '../../core/prisma'
+import { notifyDriverSafe } from '../driver-push/driver-push.service'
 
 export class RouteScheduleService {
     async create(data: { id_client: number; id_route_template: number; id_driver: number; day_of_week: number; interval_weeks: number; anchor_date: Date }) {
@@ -145,6 +146,7 @@ export class RouteScheduleService {
                     })),
                 })
             })
+            notifyDriverSafe(schedule.id_driver, { title: 'Ruta de hoy', body: `Tienes una ruta programada para hoy con ${storeIds.length} parada${storeIds.length === 1 ? '' : 's'}.` })
             created++
         }
 

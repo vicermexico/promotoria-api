@@ -1416,6 +1416,20 @@ model driver_activator_payment_logs {
   @@index([id_payment], map: "idx_driver_act_payment_logs_payment")
 }
 
+// Celulares/navegadores del chofer que aceptaron notificaciones (Web Push).
+model driver_push_subscriptions {
+  id_sub       Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_driver    Int      @db.UnsignedInt
+  vc_endpoint  String   @unique(map: "uq_driver_push_endpoint") @db.VarChar(600)
+  vc_p256dh    String   @db.VarChar(200)
+  vc_auth      String   @db.VarChar(100)
+  vc_platform  String   @default("web") @db.VarChar(20)
+  dt_register  DateTime @default(now()) @db.Timestamp(0)
+  dt_last_seen DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([id_driver], map: "idx_driver_push_driver")
+}
+
 // Cuenta (CLABE o tarjeta) del chofer para que master le deposite sus comisiones.
 // El numero se guarda cifrado (AES-256-GCM), igual que en promoter_bank_accounts.
 model driver_bank_accounts {

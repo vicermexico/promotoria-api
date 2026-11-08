@@ -1,4 +1,5 @@
 import { prisma } from '../../core/prisma'
+import { notifyDriverSafe, routeDateLabel } from '../driver-push/driver-push.service'
 
 export class DeliveryRoutes {
     /**
@@ -89,6 +90,9 @@ export class DeliveryRoutes {
                 skipDuplicates: true,
             })
             return route
+        }).then((route) => {
+            notifyDriverSafe(input.id_driver, { title: 'Nueva ruta', body: `Te asignaron una ruta para el ${routeDateLabel(route.route_date)} con ${input.stops.length} parada${input.stops.length === 1 ? '' : 's'}.` })
+            return route
         })
     }
 
@@ -134,6 +138,14 @@ export class DeliveryRoutes {
                 skipDuplicates: true,
             })
             return await tx.delivery_routes.findUnique({ where: { id_route } })
+        }).then((route) => {
+            if (existing.id_driver !== input.id_driver) {
+                notifyDriverSafe(existing.id_driver, { title: 'Ruta cambiada', body: `Ya no tienes la ruta del ${routeDateLabel(existing.route_date)}.` })
+                notifyDriverSafe(input.id_driver, { title: 'Nueva ruta', body: `Te asignaron una ruta para el ${routeDateLabel(input.route_date)} con ${input.stops.length} parada${input.stops.length === 1 ? '' : 's'}.` })
+            } else {
+                notifyDriverSafe(input.id_driver, { title: 'Ruta actualizada', body: `Cambió tu ruta del ${routeDateLabel(input.route_date)}. Ahora tiene ${input.stops.length} parada${input.stops.length === 1 ? '' : 's'}.` })
+            }
+            return route
         })
     }
 
@@ -142,6 +154,7 @@ export class DeliveryRoutes {
         if (!existing || existing.id_client !== id_client) throw new Error('Ruta no encontrada')
         await prisma.delivery_route_stops.deleteMany({ where: { id_route } })
         await prisma.delivery_routes.delete({ where: { id_route } })
+        notifyDriverSafe(existing.id_driver, { title: 'Ruta cancelada', body: `Se canceló tu ruta del ${routeDateLabel(existing.route_date)}.` })
     }
 
     async getRoutesByClient(id_client: number) {
