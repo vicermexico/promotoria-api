@@ -8,6 +8,7 @@ import { taskRankingQueue } from '../../core/bullmq/queues'
 import { NotificationService } from '../../services/notification.service'
 import { balanceService } from '../balance/balance.service'
 import { promoterRule, promoterAmount } from '../finances/commission'
+import { notifyTaskReadyForReview, notifyTaskDisputed, notifyDisputeConfirmed, notifyDisputeUpheld } from '../user-push/user-push.events'
 
 export class Task {
 
@@ -419,6 +420,7 @@ export class Task {
         if (claim.count !== 1) throw new Error('Solo se puede rechazar una tarea en revisión')
         const updated = await prisma.tasks.findUnique({ where: { id_task } })
 
+        notifyTaskDisputed(id_task)
         // El promotor NO se entera del rechazo mientras el master revisa; solo se
         // le avisa cuando el master decide (confirmDispute / upholdDispute).
 
@@ -515,6 +517,7 @@ export class Task {
                 console.error(`[Task] Error al notificar rechazo confirmado de la tarea ${id_task}:`, error)
             }
         }
+        notifyDisputeConfirmed(id_task)
         return await prisma.tasks.findUnique({ where: { id_task } })
     }
 
@@ -555,6 +558,7 @@ export class Task {
                 console.error(`[Task] Error al notificar aprobación de la tarea ${id_task}:`, error)
             }
         }
+        notifyDisputeUpheld(id_task)
         return await prisma.tasks.findUnique({ where: { id_task } })
     }
 
@@ -951,10 +955,12 @@ export class Task {
         if (!task) throw new Error('Tarea no encontrada')
         if (task.id_promoter !== id_promoter) throw new Error('No tienes asignada esta tarea')
 
-        return await prisma.tasks.update({
+        const completed = await prisma.tasks.update({
             where: { id_task },
             data: { id_status: 6, dt_update: new Date() }
         })
+        notifyTaskReadyForReview(id_task)
+        return completed
     }
 
     async getNearbyAvailableTasks(id_promoter: number, lat: number, lng: number, radiusMeters = 1000) {

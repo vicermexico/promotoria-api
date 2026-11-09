@@ -13,7 +13,7 @@ export interface PushSubscriptionInput {
 
 // web-push se carga al momento de usarse y con las llaves VAPID del .env.
 let _wp: any = null
-async function getWebPush(): Promise<any> {
+export async function getWebPush(): Promise<any> {
     if (_wp) return _wp
     const pub = process.env.VAPID_PUBLIC_KEY
     const priv = process.env.VAPID_PRIVATE_KEY

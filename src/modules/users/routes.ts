@@ -3,6 +3,7 @@ import { getAllUsersByClientId, createUser, createClientUser, refreshToken } fro
 import { authMiddleware, requireRole, validateBody } from "../../core/middleware"
 import { ROLES } from "../../core/constants/status.constants"
 import { createUserSchema, createClientUserSchema } from './user.schema'
+import { getMyStaffPushKey, registerMyStaffDevice, removeMyStaffDevice } from '../user-push/user-push.controller'
 
 const userAdminRouter = Router()
 
@@ -79,6 +80,11 @@ userAdminRouter.post('/client-user', authMiddleware, requireRole(ROLES.ADMIN), r
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 userAdminRouter.get('/refresh-token', refreshToken)
+
+// Avisos al celular (notificaciones) de master y cliente
+userAdminRouter.get('/me/push-key', authMiddleware, getMyStaffPushKey)
+userAdminRouter.post('/me/devices', authMiddleware, registerMyStaffDevice)
+userAdminRouter.delete('/me/devices', authMiddleware, removeMyStaffDevice)
 
 // RUTAS DINAMICAS
 

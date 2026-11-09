@@ -23,6 +23,7 @@ const EMPTY_BANK: BankInfo = { bank: '', holder: '', clabe: '', account: '', ins
 
 /** Se lanza cuando el pedido cuesta mas de lo que hay en el saldo prepago. */
 import { addIva } from '../finances/tax'
+import { notifyTopupCreated, notifyTopupApproved, notifyTopupRejected } from '../user-push/user-push.events'
 
 export class SaldoInsuficienteError extends Error {
     code = 'SALDO_INSUFICIENTE'
@@ -346,7 +347,9 @@ export class BalanceService {
                 originalName: p.file.originalname,
                 optimize: p.file.mimetype.startsWith('image/'),
             })
-            return await prisma.client_topups.update({ where: { id_topup: topup.id_topup }, data: { vc_receipt_url: url } })
+            const saved = await prisma.client_topups.update({ where: { id_topup: topup.id_topup }, data: { vc_receipt_url: url } })
+            notifyTopupCreated(p.id_client, amount)
+            return saved
         } catch (error) {
             console.error('[Balance] Error al guardar comprobante de recarga:', (error as any)?.message)
             await prisma.client_topups.delete({ where: { id_topup: topup.id_topup } }).catch(() => undefined)
@@ -387,7 +390,7 @@ export class BalanceService {
     }
 
     async approveTopup(id_topup: number, id_user: number) {
-        return await prisma.$transaction(async (tx) => {
+        const approved = await prisma.$transaction(async (tx) => {
             const topup = await tx.client_topups.findUnique({ where: { id_topup } })
             if (!topup) throw new Error('Recarga no encontrada')
             const { balance } = await lockClient(tx, topup.id_client)
@@ -404,6 +407,8 @@ export class BalanceService {
             })
             return { id_topup, id_client: topup.id_client, f_amount: Number(topup.f_amount), f_balance: after }
         })
+        notifyTopupApproved(approved.id_client, approved.f_amount, Number(approved.f_balance))
+        return approved
     }
 
     async rejectTopup(id_topup: number, id_user: number, reason: string) {
@@ -414,7 +419,9 @@ export class BalanceService {
             data: { id_status: TOPUP_STATUS.RECHAZADA, vc_rejection_reason: why, id_user_validator: id_user, dt_resolved: new Date() }
         })
         if (res.count !== 1) throw new Error('Esta recarga no existe o ya fue resuelta')
-        return await prisma.client_topups.findUnique({ where: { id_topup } })
+        const rejected = await prisma.client_topups.findUnique({ where: { id_topup } })
+        if (rejected) notifyTopupRejected(rejected.id_client, why)
+        return rejected
     }
 
     /** Ajuste manual del master (suma o resta), siempre con motivo. */

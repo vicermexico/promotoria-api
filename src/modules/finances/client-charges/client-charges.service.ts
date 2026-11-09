@@ -4,6 +4,7 @@ import { addIva } from '../tax'
 import { generateFolio } from '../../../services/folio.service'
 import { ORDER_STATUS } from '../../../core/constants/status.constants'
 import { CLIENT_CHARGE_STATUS } from '../finances.constants'
+import { notifyChargeCreated, notifyInvoicePaymentSubmitted, notifyInvoiceApproved, notifyInvoiceObserved } from '../../user-push/user-push.events'
 import {
     GenerateChargesDTO,
     ChargeFiltersDTO,
@@ -200,6 +201,7 @@ export class ClientCharges {
                 return charge
             })
             createdCharges.push(charge)
+            notifyChargeCreated(id_client, charge.vc_folio, Number(charge.f_total), input.dt_due)
         }
         return createdCharges
     }
@@ -398,7 +400,7 @@ export class ClientCharges {
     }
 
     async submitInvoicePayment(id: number, data: UpdateInvoicePaymentDTO, id_user: number) {
-        return await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             const invoice = await tx.client_charge_orders.findUnique({ where: { id } })
             if (!invoice) throw new Error('Factura no encontrada')
             if (![CLIENT_CHARGE_STATUS.PENDIENTE_PAGO, CLIENT_CHARGE_STATUS.OBSERVADO].includes(invoice.id_status as any)) {
@@ -424,6 +426,8 @@ export class ClientCharges {
 
             return updated
         })
+        notifyInvoicePaymentSubmitted(id)
+        return result
     }
 
     async updateInvoiceStatus(id: number, data: UpdateInvoiceStatusDTO, id_user: number) {
@@ -442,6 +446,7 @@ export class ClientCharges {
                 await tx.client_charge_logs.create({
                     data: { id_charge: invoice.id_charge, id_user, vc_log: `Factura ${invoice.vc_folio ?? invoice.id} aprobada y cerrada` }
                 })
+                notifyInvoiceApproved(id)
                 return updated
             }
 
@@ -460,6 +465,7 @@ export class ClientCharges {
                 await tx.client_charge_logs.create({
                     data: { id_charge: invoice.id_charge, id_user, vc_log: `Factura ${invoice.vc_folio ?? invoice.id} observada: ${data.vc_rejection_reason}` }
                 })
+                notifyInvoiceObserved(id, data.vc_rejection_reason)
                 return updated
             }
 
