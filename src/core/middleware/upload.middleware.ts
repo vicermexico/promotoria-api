@@ -46,3 +46,16 @@ export const uploadVideo = multer({
         }
     },
 });
+
+// Imagen o video (portada publica: fondos, personajes, clientes)
+export const uploadMedia = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+            cb(null, true);
+        } else {
+            cb(new Error("Solo se permiten imágenes o videos"));
+        }
+    },
+});

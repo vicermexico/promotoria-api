@@ -19,6 +19,7 @@ import routeTemplatesRouter from './route-templates/route-templates.routes'
 import routeSchedulesRouter from './route-schedules/route-schedules.routes'
 import introVideosRouter from './intro-videos/intro-videos.routes'
 import faqRouter from './faq/faq.routes'
+import inicioRouter from './inicio/inicio.routes'
 
 export {
     clientRouter,
@@ -42,4 +43,5 @@ export {
     routeSchedulesRouter,
     introVideosRouter,
     faqRouter,
+    inicioRouter,
 }

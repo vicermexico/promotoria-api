@@ -1309,3 +1309,68 @@ model faq_cliente_phrases {
 
   @@index([id_faq_cliente_question], map: "idx_faq_cliente_phrases_question")
 }
+
+/// Portada publica (modulo "inicio"): imagenes/videos de fondo del heroe.
+/// Se borra de forma logica (is_active = false); i_order define el orden.
+model landing_fondos {
+  id_landing_fondo Int      @id @default(autoincrement()) @db.UnsignedInt
+  vc_tipo          String   @db.VarChar(10) // 'imagen' | 'video'
+  vc_url           String   @db.VarChar(500)
+  vc_bucket_path   String   @db.VarChar(500)
+  i_order          Int      @default(0)
+  is_active        Boolean  @default(true)
+  dt_register      DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([is_active, i_order], map: "idx_landing_fondos_order")
+}
+
+/// Personajes de la portada: foto de la persona YA recortada (PNG/WebP con transparencia).
+model landing_personajes {
+  id_landing_personaje Int      @id @default(autoincrement()) @db.UnsignedInt
+  vc_nombre            String?  @db.VarChar(100)
+  vc_puesto            String?  @db.VarChar(100)
+  vc_url               String   @db.VarChar(500)
+  vc_bucket_path       String   @db.VarChar(500)
+  i_order              Int      @default(0)
+  is_active            Boolean  @default(true)
+  dt_register          DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([is_active, i_order], map: "idx_landing_personajes_order")
+}
+
+/// Clientes que se muestran en la portada (logo o video corto + enlace opcional). Empieza vacia.
+model landing_clientes {
+  id_landing_cliente Int      @id @default(autoincrement()) @db.UnsignedInt
+  vc_nombre          String   @db.VarChar(150)
+  vc_tipo            String   @db.VarChar(10) // 'imagen' | 'video'
+  vc_url             String   @db.VarChar(500)
+  vc_bucket_path     String   @db.VarChar(500)
+  vc_enlace          String?  @db.VarChar(500)
+  i_order            Int      @default(0)
+  is_active          Boolean  @default(true)
+  dt_register        DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([is_active, i_order], map: "idx_landing_clientes_order")
+}
+
+/// Fila UNICA (id_landing_config = 1) con titulo del heroe, contactos, redes y credito.
+/// Campo vacio (NULL) = no se muestra en la portada.
+model landing_config {
+  id_landing_config Int      @id @default(1) @db.UnsignedInt
+  vc_titulo         String?  @db.VarChar(200)
+  vc_telefono       String?  @db.VarChar(30)
+  vc_whatsapp       String?  @db.VarChar(30)
+  vc_correo         String?  @db.VarChar(150)
+  vc_direccion      String?  @db.VarChar(300)
+  vc_horario        String?  @db.VarChar(200)
+  vc_sitio_web      String?  @db.VarChar(300)
+  vc_instagram_url  String?  @db.VarChar(300)
+  vc_facebook_url   String?  @db.VarChar(300)
+  vc_tiktok_url     String?  @db.VarChar(300)
+  vc_youtube_url    String?  @db.VarChar(300)
+  vc_x_url          String?  @db.VarChar(300)
+  vc_linkedin_url   String?  @db.VarChar(300)
+  vc_dev_nombre     String?  @db.VarChar(100)
+  vc_dev_whatsapp   String?  @db.VarChar(30)
+  dt_update         DateTime @default(now()) @updatedAt @db.Timestamp(0)
+}
