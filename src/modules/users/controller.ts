@@ -130,9 +130,17 @@ export const refreshToken = async(req: Request, res: Response) => {
       });
     }
 
-    const verification = Utils.verify_token(token);
-
-    console.log("token verification", verification);
+    let verification
+    try {
+      verification = await Utils.verify_token(token)
+    } catch {
+      return res.status(401).json({
+        ok: false,
+        error: 1,
+        data: null,
+        message: "Sesión inválida o vencida"
+      })
+    }
 
     return res.status(200).json({
       ok: true,
