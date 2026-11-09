@@ -14,7 +14,7 @@ import staffRouter from "./modules/staff/staff.routes"
 import faqClienteRouter from "./modules/faq-cliente/faq-cliente.routes";
 import { vigilarEquipo } from "./modules/staff/permisos.guard";
 import mobileRouter from "./app_mobile/index"
-import { clientRouter, productRouter, userAdminRouter, storeRouter, channelsSalesRouter, promoterRouter, questionRouter, requestRouter, orderRouter, taskRouter, financesRouter, taskSettingsRouter, appConfigRouter, stockRouter, preorderRouter, driversRouter, deliveryRoutesRouter, routeTemplatesRouter, routeSchedulesRouter, introVideosRouter, faqRouter, balanceRouter } from './modules'
+import { clientRouter, productRouter, userAdminRouter, storeRouter, channelsSalesRouter, promoterRouter, questionRouter, requestRouter, orderRouter, taskRouter, financesRouter, taskSettingsRouter, appConfigRouter, stockRouter, preorderRouter, driversRouter, deliveryRoutesRouter, routeTemplatesRouter, routeSchedulesRouter, introVideosRouter, faqRouter, balanceRouter, inicioRouter } from './modules'
 import promoterSelfPaymentsRouter from './modules/promoter-payments-self/promoter-self-payments.routes'
 import { errorHandler } from "./core/middleware"
 import { setupSwagger } from "./config/swagger"
@@ -128,6 +128,7 @@ app.use("/retailink-api/drivers", driversRouter)
 app.use("/retailink-api/delivery-routes", deliveryRoutesRouter)
 app.use("/retailink-api/intro-videos", introVideosRouter)
 app.use("/retailink-api/faq", faqRouter)
+app.use("/retailink-api/inicio", inicioRouter)
 app.use("/retailink-api/faq-cliente", faqClienteRouter);
 
 // Manejo global de errores (multer, no controlados): debe ir después de todas las rutas.
