@@ -11,6 +11,14 @@ export class InicioError extends Error {}
 
 const ID_CONFIG = 1
 const MIMES_PERSONAJE = ['image/png', 'image/webp'] // con transparencia
+// Un personaje tambien puede ser un VIDEO con fondo verde: el navegador le quita el verde al reproducirlo.
+const MIMES_PERSONAJE_VIDEO = ['video/mp4', 'video/webm', 'video/quicktime']
+
+/** Tipo del personaje a partir de la extension de su archivo (no hay columna de tipo: no se toca la base). */
+function tipoPersonaje(url: string): InicioTipoMedia {
+    const ruta = url.split('?')[0]
+    return /\.(mp4|webm|mov|m4v)$/i.test(ruta) ? 'video' : 'imagen'
+}
 
 function slug(name: string): string {
     return name
@@ -62,7 +70,7 @@ export class Inicio {
         ])
         return {
             fondos: fondos.map((f): InicioFondoDTO => ({ id: f.id_landing_fondo, tipo: f.vc_tipo as InicioTipoMedia, url: f.vc_url })),
-            personajes: personajes.map((p): InicioPersonajeDTO => ({ id: p.id_landing_personaje, nombre: p.vc_nombre, puesto: p.vc_puesto, url: p.vc_url })),
+            personajes: personajes.map((p): InicioPersonajeDTO => ({ id: p.id_landing_personaje, nombre: p.vc_nombre, puesto: p.vc_puesto, tipo: tipoPersonaje(p.vc_url), url: p.vc_url })),
             clientes: clientes.map((c): InicioClienteDTO => ({ id: c.id_landing_cliente, nombre: c.vc_nombre, tipo: c.vc_tipo as InicioTipoMedia, url: c.vc_url, enlace: c.vc_enlace })),
             config,
         }
@@ -130,14 +138,14 @@ export class Inicio {
     // ---------------------------------------------------------------- personajes
 
     async addPersonaje(archivo: InicioArchivoDTO, nombre: unknown, puesto: unknown): Promise<InicioPersonajeDTO> {
-        this.validarImagenPersonaje(archivo)
+        this.validarArchivoPersonaje(archivo)
         const vc_nombre = textoOpcional(nombre, 100, 'nombre')
         const vc_puesto = textoOpcional(puesto, 100, 'puesto')
         const subido = await this.subir(archivo, 'personajes')
         const p = await prisma.landing_personajes.create({
             data: { vc_nombre, vc_puesto, vc_url: subido.url, vc_bucket_path: subido.path, i_order: await this.siguienteOrden('personajes') },
         })
-        return { id: p.id_landing_personaje, nombre: p.vc_nombre, puesto: p.vc_puesto, url: p.vc_url }
+        return { id: p.id_landing_personaje, nombre: p.vc_nombre, puesto: p.vc_puesto, tipo: tipoPersonaje(p.vc_url), url: p.vc_url }
     }
 
     async updatePersonaje(id: number, body: { nombre?: unknown, puesto?: unknown }, archivo?: InicioArchivoDTO): Promise<InicioPersonajeDTO> {
@@ -148,7 +156,7 @@ export class Inicio {
         if ('nombre' in body) data.vc_nombre = textoOpcional(body.nombre, 100, 'nombre')
         if ('puesto' in body) data.vc_puesto = textoOpcional(body.puesto, 100, 'puesto')
         if (archivo) {
-            this.validarImagenPersonaje(archivo)
+            this.validarArchivoPersonaje(archivo)
             const subido = await this.subir(archivo, 'personajes')
             data.vc_url = subido.url
             data.vc_bucket_path = subido.path
@@ -157,7 +165,7 @@ export class Inicio {
         const p = await prisma.landing_personajes.update({ where: { id_landing_personaje: id }, data })
         // Reemplazo de foto: se quita la anterior del bucket para no dejar archivos huerfanos.
         if (archivo) await StorageService.deleteRawFile(actual.vc_bucket_path).catch(() => undefined)
-        return { id: p.id_landing_personaje, nombre: p.vc_nombre, puesto: p.vc_puesto, url: p.vc_url }
+        return { id: p.id_landing_personaje, nombre: p.vc_nombre, puesto: p.vc_puesto, tipo: tipoPersonaje(p.vc_url), url: p.vc_url }
     }
 
     async deletePersonaje(id: number) {
@@ -234,9 +242,9 @@ export class Inicio {
 
     // ---------------------------------------------------------------- internos
 
-    private validarImagenPersonaje(archivo: InicioArchivoDTO) {
-        if (!MIMES_PERSONAJE.includes(archivo.mime)) {
-            throw new InicioError('La foto del personaje debe ser PNG o WebP con fondo transparente (ya recortada)')
+    private validarArchivoPersonaje(archivo: InicioArchivoDTO) {
+        if (!MIMES_PERSONAJE.includes(archivo.mime) && !MIMES_PERSONAJE_VIDEO.includes(archivo.mime)) {
+            throw new InicioError('El personaje debe ser una foto PNG/WebP con fondo transparente (ya recortada) o un video MP4/WebM/MOV con fondo verde')
         }
     }
 

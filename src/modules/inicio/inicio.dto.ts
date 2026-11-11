@@ -5,7 +5,7 @@ export type InicioSeccion = typeof INICIO_SECCIONES[number]
 
 // Contrato que consume el front de la portada (panel/src/modules/landing/tipos.ts).
 export interface InicioFondoDTO { id: number, tipo: InicioTipoMedia, url: string }
-export interface InicioPersonajeDTO { id: number, nombre: string | null, puesto: string | null, url: string }
+export interface InicioPersonajeDTO { id: number, nombre: string | null, puesto: string | null, tipo: InicioTipoMedia, url: string }
 export interface InicioClienteDTO { id: number, nombre: string, tipo: InicioTipoMedia, url: string, enlace: string | null }
 
 export interface InicioConfigDTO {
